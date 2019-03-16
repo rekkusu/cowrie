@@ -32,6 +32,7 @@ __all__ = [
     'tar',
     'uname',
     'ulimit',
+    'wc',
     'wget',
     'which',
     'perl',
