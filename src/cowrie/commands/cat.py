@@ -87,6 +87,14 @@ class command_cat(HoneyPotCommand):
 
         self.output(line)
 
+    def pipeReceived(self, data):
+        log.msg(eventid='cowrie.session.input',
+                realm='cat',
+                input=data,
+                format='PIPE (%(realm)s): %(input)s')
+
+        self.output(data)
+
     def handle_CTRL_D(self):
         """
         ctrl-d is end-of-file, time to terminate

@@ -359,6 +359,7 @@ class StdOutStdErrEmulationProtocol(object):
         self.data = b""
         self.err_data = b""
         self.protocol = protocol
+        self.process = None
 
     def connectionMade(self):
 
@@ -378,10 +379,13 @@ class StdOutStdErrEmulationProtocol(object):
             else:
                 log.msg("Connection was probably lost. Could not write to terminal")
         else:
-            self.next_command.input_data = self.data
-            npcmd = self.next_command.cmd
-            npcmdargs = self.next_command.cmdargs
-            self.protocol.call_command(self.next_command, npcmd, *npcmdargs)
+            if self.next_command.process and hasattr(self.next_command.process, 'pipeReceived'):
+                self.next_command.process.pipeReceived(self.data)
+            else:
+                self.next_command.input_data = self.data
+                npcmd = self.next_command.cmd
+                npcmdargs = self.next_command.cmdargs
+                self.protocol.call_command(self.next_command, npcmd, *npcmdargs)
 
     def insert_command(self, command):
         """
@@ -411,6 +415,12 @@ class StdOutStdErrEmulationProtocol(object):
 
     def errConnectionLost(self):
         pass
+
+    def exit(self):
+        self.process = None
+
+        if self.next_command and self.next_command.process:
+            self.next_command.process.exit()
 
     def processExited(self, reason):
         log.msg("processExited for %s, status %d" % (self.cmd, reason.value.exitCode))

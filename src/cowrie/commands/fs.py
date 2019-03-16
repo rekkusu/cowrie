@@ -75,7 +75,10 @@ class command_grep(HoneyPotCommand):
             for pname in files:
                 self.grep_get_contents(pname, args[0])
         else:
+            self.keyword = args[0]
             self.grep_application(self.input_data, args[0])
+            # does not exit
+            return
 
         self.exit()
 
@@ -84,6 +87,9 @@ class command_grep(HoneyPotCommand):
                 realm='grep',
                 input=line,
                 format='INPUT (%(realm)s): %(input)s')
+
+    def pipeReceived(self, line):
+        self.grep_application(line, self.keyword)
 
     def handle_CTRL_D(self):
         self.exit()
@@ -136,20 +142,27 @@ class command_tail(HoneyPotCommand):
                         self.errorWrite("tail: illegal offset -- {}\n".format(opt[1]))
                     else:
                         self.n = int(opt[1])
-        if not self.input_data:
+        if self.input_data is None:
             files = self.check_arguments("tail", args)
             for pname in files:
                 self.tail_get_contents(pname)
+            self.exit()
         else:
-            self.tail_application(self.input_data)
+            self.buffer = self.input_data
 
-        self.exit()
 
     def lineReceived(self, line):
         log.msg(eventid='cowrie.command.input',
                 realm='tail',
                 input=line,
                 format='INPUT (%(realm)s): %(input)s')
+
+    def pipeReceived(self, line):
+        self.buffer += line
+
+    def exit(self):
+        self.tail_application(self.buffer)
+        HoneyPotCommand.exit(self)
 
     def handle_CTRL_D(self):
         self.exit()
@@ -165,17 +178,25 @@ class command_head(HoneyPotCommand):
     """
 
     def head_application(self, contents):
-        i = 0
         contentsplit = contents.split(b'\n')
+        if b'\n' not in contents:
+            self.writeBytes(contents)
+            return
+
         for line in contentsplit:
-            if i < self.n:
+            if self.line_remains > 0:
                 self.writeBytes(line + b'\n')
-            i += 1
+                self.line_remains -= 1
 
     def head_get_file_contents(self, filename):
         try:
             contents = self.fs.file_contents(filename)
-            self.head_application(contents)
+            i = 0
+            contentsplit = contents.split(b'\n')
+            for line in contentsplit:
+                if i < self.n:
+                    self.writeBytes(line + b'\n')
+                i += 1
         except Exception:
             self.errorWrite("head: cannot open `{}' for reading: No such file or directory\n".format(filename))
 
@@ -198,17 +219,23 @@ class command_head(HoneyPotCommand):
                     else:
                         self.n = int(opt[1])
 
-        if not self.input_data:
+        if self.input_data is None:
             files = self.check_arguments("head", args)
             for pname in files:
+                self.line_remains = self.n
                 self.head_get_file_contents(pname)
+
+            self.exit()
         else:
+            self.line_remains = self.n
             self.head_application(self.input_data)
-        self.exit()
 
     def lineReceived(self, line):
         log.msg(eventid='cowrie.command.input', realm='head', input=line,
                 format='INPUT (%(realm)s): %(input)s')
+
+    def pipeReceived(self, line):
+        self.head_application(line)
 
     def handle_CTRL_D(self):
         self.exit()

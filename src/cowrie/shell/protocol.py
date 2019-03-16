@@ -190,6 +190,7 @@ class HoneyPotBaseProtocol(insults.TerminalProtocol, TimeoutMixin):
         self.pp = pp
         obj = cmd(self, *args)
         obj.set_input_data(pp.input_data)
+        self.pp.process = obj
         self.cmdstack.append(obj)
         obj.start()
 

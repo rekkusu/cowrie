@@ -33,6 +33,7 @@ class HoneyPotCommand(object):
 
     def __init__(self, protocol, *args):
         self.protocol = protocol
+        self.pp = self.protocol.pp
         self.args = list(args)
         self.environ = self.protocol.cmdstack[0].environ
         self.fs = self.protocol.fs
@@ -141,17 +142,20 @@ class HoneyPotCommand(object):
             else:
                 self.protocol.terminal.redirFiles.add((self.safeoutfile, ''))
 
-        if len(self.protocol.cmdstack):
-            self.protocol.cmdstack.pop()
+        if self.pp.process:
+            self.pp.exit()
+
             if len(self.protocol.cmdstack):
-                self.protocol.cmdstack[-1].resume()
-        else:
-            ret = failure.Failure(error.ProcessDone(status=""))
-            # The session could be disconnected already, when his happens .transport is gone
-            try:
-                self.protocol.terminal.transport.processEnded(ret)
-            except AttributeError:
-                pass
+                self.protocol.cmdstack.pop()
+                if len(self.protocol.cmdstack):
+                    self.protocol.cmdstack[-1].resume()
+            else:
+                ret = failure.Failure(error.ProcessDone(status=""))
+                # The session could be disconnected already, when his happens .transport is gone
+                try:
+                    self.protocol.terminal.transport.processEnded(ret)
+                except AttributeError:
+                    pass
 
     def handle_CTRL_C(self):
         log.msg('Received CTRL-C, exiting..')
